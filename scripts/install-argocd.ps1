@@ -23,8 +23,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "kubectl cannot access the current cluster."
 }
 
-kubectl get namespace argocd *> $null
+$argocdNamespace = kubectl get namespace argocd --ignore-not-found -o name
 if ($LASTEXITCODE -ne 0) {
+    throw "Failed to check whether namespace 'argocd' exists."
+}
+
+if (-not $argocdNamespace) {
     Write-Host "Creating the Argo CD namespace..."
     kubectl create namespace argocd | Out-Host
     if ($LASTEXITCODE -ne 0) {
