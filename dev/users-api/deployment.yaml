@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-api
+  namespace: dev-users-api
+  labels:
+    app: users-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-api
+  template:
+    metadata:
+      labels:
+        app: users-api
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: users-api
+          # Replace with a real immutable CI-published tag before runtime deployment.
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/users-api:__IMAGE_TAG_PENDING_CI__
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVER_PORT
+              value: "8083"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: docket-jwt
+                  key: jwt-secret
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
