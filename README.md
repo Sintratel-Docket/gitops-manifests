@@ -19,11 +19,12 @@ This repository does not build or publish images and does not create namespaces 
 |-- argocd/
 |   `-- root-app.yaml
 |-- dev/
-|   |-- apps/                       # five Argo CD child Applications
+|   |-- apps/                       # microservice and validation Applications
 |   |-- frontend/                   # Deployment and ClusterIP Service
 |   |-- auth-api/                   # Deployment and ClusterIP Service
 |   |-- users-api/                  # Deployment and ClusterIP Service
 |   |-- todos-api/                  # API plus its internal Redis dependency
+|   |-- gitops-validation/          # harmless reconciliation test ConfigMap
 |   `-- log-message-processor/      # worker Deployment; no Service
 |-- staging/
 `-- prod/
@@ -33,7 +34,7 @@ DEV is the only configured environment. `staging/` and `prod/` are intentional s
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages exactly five child Applications:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages the five microservice Applications plus one isolated validation Application:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -42,6 +43,7 @@ DEV is the only configured environment. `staging/` and `prod/` are intentional s
 | `users-api` | `dev/users-api` | `dev-users-api` |
 | `todos-api` | `dev/todos-api` | `dev-todos-api` |
 | `log-message-processor` | `dev/log-message-processor` | `dev-log-message-processor` |
+| `gitops-validation` | `dev/gitops-validation` | `dev-frontend` |
 
 Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent because Terraform owns all five namespaces.
 
@@ -59,7 +61,7 @@ Images come from account `429418377318` in `us-east-1`:
 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor
 ```
 
-The ECR repositories were recreated and could not be inspected while this repository was initialized. Each microservice manifest therefore contains the explicit non-deployable tag `__IMAGE_TAG_PENDING_CI__`. Do not bootstrap these Applications for runtime use until CI has published real immutable tags and all placeholders have been replaced.
+The ECR repositories were recreated and could not be inspected while this repository was initialized. Each microservice manifest therefore contains the explicit non-deployable tag `__IMAGE_TAG_PENDING_CI__`. Microservice Pods cannot become healthy until CI has published real immutable tags and all placeholders have been replaced. Argo CD and the image-independent `gitops-validation` Application can still be bootstrapped to prove reconciliation.
 
 To update a version, edit only the applicable Deployment image, for example:
 
@@ -120,11 +122,18 @@ kubectl get pods -n argocd
 kubectl get svc -n argocd
 ```
 
+On Windows, the same pinned and internal-only installation is automated by:
+
+```powershell
+.\scripts\install-argocd.ps1
+.\scripts\verify-argocd.ps1
+```
+
 No Ingress or public LoadBalancer is used.
 
 ## Bootstrap and inspect
 
-Merge the feature branch to `main` and replace all pending image tags before the one-time root bootstrap:
+Merge the feature branch to `main` before the one-time root bootstrap. Pending image tags will leave the affected workloads unhealthy, but do not prevent the validation ConfigMap from reconciling:
 
 ```bash
 kubectl apply -f argocd/root-app.yaml
@@ -132,7 +141,13 @@ kubectl get applications -n argocd
 kubectl get application docket-dev-root -n argocd
 ```
 
-Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, and `log-message-processor`.
+On Windows, bootstrap only the root Application with:
+
+```powershell
+.\scripts\bootstrap-root-app.ps1
+```
+
+Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, and `gitops-validation`.
 
 If the Argo CD CLI is installed:
 
@@ -166,24 +181,40 @@ The initial username is `admin`. Rotate or disable the initial credential accord
 
 ## Reconciliation validation
 
+The dedicated `gitops-validation` Application owns only `dev/gitops-validation/configmap.yaml` in the existing Terraform-owned `dev-frontend` namespace. It does not replace the final image-rollout Definition of Done.
+
 After bootstrap, validate automated sync without manually applying the changed resource:
+
+1. Confirm `gitops-validation` is Synced and the ConfigMap declares `validation-version: "1"`.
+2. Change `validation-version` in Git from `"1"` to `"2"`.
+3. Commit and merge the change to `main`.
+4. Do not run `argocd app sync` or `kubectl apply`.
+5. Observe `OutOfSync` followed by `Synced` with `kubectl get applications -n argocd -w`.
+6. Confirm the live value:
+
+```bash
+kubectl get configmap gitops-validation -n dev-frontend \
+  -o jsonpath='{.data.validation-version}'
+```
+
+With Git still declaring `"2"`, validate self-heal by changing only the live ConfigMap:
+
+```bash
+kubectl patch configmap gitops-validation -n dev-frontend --type merge \
+  -p '{"data":{"validation-version":"manual-drift"}}'
+kubectl get application gitops-validation -n argocd -w
+kubectl get configmap gitops-validation -n dev-frontend \
+  -o jsonpath='{.data.validation-version}'
+```
+
+Argo CD should restore `"2"`. Do not commit the drift. `prune: true` is configured; any prune demonstration must use only another disposable resource in `dev/gitops-validation`.
+
+The pod-template reconciliation marker remains available for later workload-specific checks:
 
 1. Change `gitops.sintratel.io/reconciliation-marker` on a Deployment pod template.
 2. Commit and merge the change to `main`.
 3. Observe `OutOfSync` followed by `Synced` with `kubectl get applications -n argocd -w`.
 4. Confirm the live annotation with `kubectl get deployment <name> -n <namespace> -o jsonpath='{.spec.template.metadata.annotations}'`.
-
-Validate self-heal by changing only that harmless live annotation:
-
-```bash
-kubectl annotate deployment/todos-api -n dev-todos-api \
-  gitops.sintratel.io/reconciliation-marker=temporary-drift --overwrite
-kubectl get application todos-api -n argocd -w
-kubectl get deployment/todos-api -n dev-todos-api \
-  -o jsonpath='{.spec.template.metadata.annotations.gitops\.sintratel\.io/reconciliation-marker}'
-```
-
-Argo CD should restore the Git value. Do not commit the drift and do not alter Secrets or critical fields. `prune: true` is configured; any prune test should use only a disposable Git-managed ConfigMap.
 
 ## Pending live execution
 
