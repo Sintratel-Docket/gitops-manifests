@@ -60,9 +60,16 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Waiting for all Argo CD pods to become Ready..."
-kubectl wait --for=condition=Ready pod --all -n argocd --timeout=600s | Out-Host
+$argocdPods = @(kubectl get pods -n argocd -o name)
 if ($LASTEXITCODE -ne 0) {
-    throw "One or more Argo CD pods did not become Ready."
+    throw "Failed to list Argo CD pods."
+}
+
+foreach ($argocdPod in $argocdPods) {
+    kubectl wait --for=condition=Ready $argocdPod -n argocd --timeout=600s | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Argo CD pod did not become Ready: $argocdPod"
+    }
 }
 
 kubectl get pods -n argocd | Out-Host
