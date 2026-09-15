@@ -9,4 +9,4 @@ metadata:
 data:
   environment: dev
   managed-by: argocd
-  validation-version: "1"
+  validation-version: "2"
