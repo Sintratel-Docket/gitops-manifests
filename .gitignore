@@ -1,0 +1,16 @@
+# Local editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Kubernetes and Helm local output
+*.kubeconfig
+charts/*.tgz
