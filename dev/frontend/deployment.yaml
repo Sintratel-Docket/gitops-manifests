@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: dev-frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: frontend
+          # Replace with a real immutable CI-published tag before runtime deployment.
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/frontend:__IMAGE_TAG_PENDING_CI__
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "8080"
+            - name: AUTH_API_ADDRESS
+              value: http://auth-api.dev-auth-api.svc.cluster.local:8000
+            - name: TODOS_API_ADDRESS
+              value: http://todos-api.dev-todos-api.svc.cluster.local:8082
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
