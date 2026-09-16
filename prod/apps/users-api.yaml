@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-users-api
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
+    targetRevision: main
+    path: prod/users-api
+  destination:
+    name: docket-prod
+    namespace: prod-users-api
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
