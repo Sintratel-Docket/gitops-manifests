@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: todos-api
-          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/todos-api:1.1.0-f330d30
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/todos-api:1.2.0-2cf6a56
           imagePullPolicy: IfNotPresent
           env:
             - name: TODO_API_PORT

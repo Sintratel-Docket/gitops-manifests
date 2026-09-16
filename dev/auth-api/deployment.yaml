@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: auth-api
-          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/auth-api:1.0.0-d2cb205
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/auth-api:1.1.0-7fbb9db
           imagePullPolicy: IfNotPresent
           env:
             - name: AUTH_API_PORT
