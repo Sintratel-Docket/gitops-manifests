@@ -19,8 +19,7 @@ spec:
     spec:
       containers:
         - name: users-api
-          # Replace with a real immutable CI-published tag before runtime deployment.
-          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/users-api:__IMAGE_TAG_PENDING_CI__
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/users-api:1.0.0-43588d4
           imagePullPolicy: IfNotPresent
           env:
             - name: SERVER_PORT

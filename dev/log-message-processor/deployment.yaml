@@ -19,8 +19,7 @@ spec:
     spec:
       containers:
         - name: log-message-processor
-          # Replace with a real immutable CI-published tag before runtime deployment.
-          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor:__IMAGE_TAG_PENDING_CI__
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor:1.0.0-165ae2a
           imagePullPolicy: IfNotPresent
           env:
             - name: REDIS_HOST
