@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: staging-frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: frontend
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/frontend:1.0.0-62c1327
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "8080"
+            - name: AUTH_API_ADDRESS
+              value: http://auth-api.staging-auth-api.svc.cluster.local:8000
+            - name: TODOS_API_ADDRESS
+              value: http://todos-api.staging-todos-api.svc.cluster.local:8082
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP

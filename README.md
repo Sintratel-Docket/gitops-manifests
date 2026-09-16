@@ -1,6 +1,6 @@
 # SINTRATEL Docket GitOps manifests
 
-This repository is the deployment source of truth for the SINTRATEL Docket Kubernetes applications. Argo CD reads the desired state from `main` and continuously reconciles the DEV cluster to match it.
+This repository is the deployment source of truth for the SINTRATEL Docket Kubernetes applications. It declares desired state for DEV, staging, and production. Argo CD reads that state from `main` and continuously reconciles each registered cluster to match it.
 
 ## Ownership boundaries
 
@@ -17,7 +17,8 @@ This repository does not build or publish images and does not create namespaces 
 ```text
 .
 |-- argocd/
-|   `-- root-app.yaml
+|   |-- environments/               # dev, staging, and prod environment Applications
+|   `-- root-app.yaml               # root Application for argocd/environments
 |-- dev/
 |   |-- apps/                       # workload, validation, and gateway Applications
 |   |-- gateway/                    # GatewayClass, Gateway, and AWS LB configuration
@@ -27,15 +28,16 @@ This repository does not build or publish images and does not create namespaces 
 |   |-- todos-api/                  # API plus its internal Redis dependency
 |   |-- gitops-validation/          # harmless reconciliation test ConfigMap
 |   `-- log-message-processor/      # worker Deployment; no Service
-|-- staging/
-`-- prod/
+|-- staging/                        # staging Applications and workload manifests
+|-- prod/                           # production Applications and workload manifests
+`-- docs/gitops/promotion.md        # image promotion workflow
 ```
 
-DEV is the only configured environment. `staging/` and `prod/` are intentional skeletons and have no Argo CD Applications yet.
+DEV, staging, and production each have environment-specific Applications and manifests. Staging and production remain inactive until their clusters and operational prerequisites are available.
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages the five microservice Applications, one isolated validation Application, the shared gateway Application, and the observability Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, and the observability Application:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -46,9 +48,10 @@ DEV is the only configured environment. `staging/` and `prod/` are intentional s
 | `log-message-processor` | `dev/log-message-processor` | `dev-log-message-processor` |
 | `gitops-validation` | `dev/gitops-validation` | `dev-frontend` |
 | `gateway` | `dev/gateway` | `dev-frontend` |
+| `kubecost` | official `cost-analyzer` chart | `kubecost` |
 | `observability` | official `kube-prometheus-stack` chart plus `dev/observability` | `dev-observability` |
 
-Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent because Terraform owns the five application namespaces and `dev-observability`.
+Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost retains its independently managed namespace option.
 
 Redis is required by the application source. Its Deployment and internal ClusterIP Service are managed by the `todos-api` Application in `dev-todos-api`. The worker uses the cross-namespace address `redis.dev-todos-api.svc.cluster.local`. Redis is supporting software, not a sixth microservice Application.
 
@@ -65,6 +68,8 @@ Images come from account `429418377318` in `us-east-1`:
 ```
 
 Each Deployment references a real immutable tag published by its application CI pipeline. Git remains the only place where deployed image versions are selected; `latest` and invented tags are forbidden.
+
+See [GitOps image promotion](docs/gitops/promotion.md) for the DEV to staging to production promotion and rollback workflow.
 
 To update a version, edit only the applicable Deployment image, for example:
 
@@ -182,7 +187,7 @@ On Windows, bootstrap only the root Application with:
 .\scripts\bootstrap-root-app.ps1
 ```
 
-Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, `gitops-validation`, and `gateway`.
+The root creates the `dev`, `staging`, and `prod` environment Applications. `dev` preserves the existing `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, `gitops-validation`, and `gateway` Applications. Staging and production create their prefixed workload Applications after their destination clusters are registered.
 
 If the Argo CD CLI is installed:
 

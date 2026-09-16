@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todos-api
+  namespace: staging-todos-api
+  labels:
+    app: todos-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todos-api
+  template:
+    metadata:
+      labels:
+        app: todos-api
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: todos-api
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/todos-api:1.1.0-f330d30
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TODO_API_PORT
+              value: "8082"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: docket-jwt
+                  key: jwt-secret
+            - name: REDIS_HOST
+              value: redis.staging-todos-api.svc.cluster.local
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_CHANNEL
+              value: log_channel
+          ports:
+            - name: http
+              containerPort: 8082
+              protocol: TCP
