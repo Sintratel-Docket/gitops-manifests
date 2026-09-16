@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-api
+  namespace: prod-users-api
+  labels:
+    app: users-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-api
+  template:
+    metadata:
+      labels:
+        app: users-api
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: users-api
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/users-api:1.0.0-43588d4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SERVER_PORT
+              value: "8083"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: docket-jwt
+                  key: jwt-secret
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP

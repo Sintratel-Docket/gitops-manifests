@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: docket-dev-root
+  name: prod-users-api
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,10 +10,10 @@ spec:
   source:
     repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
     targetRevision: main
-    path: argocd/environments
+    path: prod/users-api
   destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
+    name: docket-prod
+    namespace: prod-users-api
   syncPolicy:
     automated:
       enabled: true

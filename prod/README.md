@@ -1,5 +1,5 @@
 # Production environment
 
-Production is intentionally a skeleton. No production manifests or Argo CD Applications exist yet.
+Production mirrors the staging workloads with environment-specific namespaces, service DNS names, Gateway resources, and Argo CD Applications. It uses immutable CI-published ECR tags promoted through staging.
 
-Production enablement requires an approved platform design, Terraform-managed namespaces and infrastructure, immutable CI-published ECR tags, environment-specific configuration, secret-management controls, and a reviewed Argo CD promotion workflow. Do not copy DEV Secrets or credentials into Git.
+The `docket-prod` cluster must be registered in the central Argo CD instance before these Applications can synchronize. Create the required `docket-jwt` Secrets outside Git; do not store credentials in this repository.

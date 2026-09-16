@@ -1,6 +1,6 @@
 # SINTRATEL Docket GitOps manifests
 
-This repository is the deployment source of truth for the SINTRATEL Docket Kubernetes applications. Argo CD reads the desired state from `main` and continuously reconciles the DEV cluster to match it.
+This repository is the deployment source of truth for the SINTRATEL Docket Kubernetes applications. It declares desired state for DEV, staging, and production. Argo CD reads that state from `main` and continuously reconciles each registered cluster to match it.
 
 ## Ownership boundaries
 
@@ -17,7 +17,8 @@ This repository does not build or publish images and does not create namespaces 
 ```text
 .
 |-- argocd/
-|   `-- root-app.yaml
+|   |-- environments/               # dev, staging, and prod environment Applications
+|   `-- root-app.yaml               # root Application for argocd/environments
 |-- dev/
 |   |-- apps/                       # workload, validation, and gateway Applications
 |   |-- gateway/                    # GatewayClass, Gateway, and AWS LB configuration
@@ -27,15 +28,16 @@ This repository does not build or publish images and does not create namespaces 
 |   |-- todos-api/                  # API plus its internal Redis dependency
 |   |-- gitops-validation/          # harmless reconciliation test ConfigMap
 |   `-- log-message-processor/      # worker Deployment; no Service
-|-- staging/
-`-- prod/
+|-- staging/                        # staging Applications and workload manifests
+|-- prod/                           # production Applications and workload manifests
+`-- docs/gitops/promotion.md        # image promotion workflow
 ```
 
-DEV is the only configured environment. `staging/` and `prod/` are intentional skeletons and have no Argo CD Applications yet.
+DEV, staging, and production each have environment-specific Applications and manifests. Staging and production remain inactive until their clusters and operational prerequisites are available.
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages the five microservice Applications, one isolated validation Application, and the shared gateway Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, and the shared gateway Application:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -64,6 +66,8 @@ Images come from account `429418377318` in `us-east-1`:
 ```
 
 Each Deployment references a real immutable tag published by its application CI pipeline. Git remains the only place where deployed image versions are selected; `latest` and invented tags are forbidden.
+
+See [GitOps image promotion](docs/gitops/promotion.md) for the DEV to staging to production promotion and rollback workflow.
 
 To update a version, edit only the applicable Deployment image, for example:
 
@@ -181,7 +185,7 @@ On Windows, bootstrap only the root Application with:
 .\scripts\bootstrap-root-app.ps1
 ```
 
-Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, `gitops-validation`, and `gateway`.
+The root creates the `dev`, `staging`, and `prod` environment Applications. `dev` preserves the existing `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, `gitops-validation`, and `gateway` Applications. Staging and production create their prefixed workload Applications after their destination clusters are registered.
 
 If the Argo CD CLI is installed:
 

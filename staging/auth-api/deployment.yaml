@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-api
+  namespace: staging-auth-api
+  labels:
+    app: auth-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-api
+  template:
+    metadata:
+      labels:
+        app: auth-api
+      annotations:
+        gitops.sintratel.io/reconciliation-marker: baseline
+    spec:
+      containers:
+        - name: auth-api
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/auth-api:1.0.0-d2cb205
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: AUTH_API_PORT
+              value: "8000"
+            - name: USERS_API_ADDRESS
+              value: http://users-api.staging-users-api.svc.cluster.local:8083
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: docket-jwt
+                  key: jwt-secret
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
