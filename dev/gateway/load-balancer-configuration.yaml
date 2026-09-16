@@ -1,0 +1,13 @@
+apiVersion: gateway.k8s.aws/v1beta1
+kind: LoadBalancerConfiguration
+metadata:
+  name: docket-dev-alb-config
+  namespace: dev-frontend
+spec:
+  loadBalancerName: docket-dev-gateway
+  scheme: internet-facing
+  ipAddressType: ipv4
+  tags:
+    Environment: dev
+    ManagedBy: ArgoCD
+    Project: Sintratel-Docket

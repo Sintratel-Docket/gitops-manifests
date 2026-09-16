@@ -1,0 +1,12 @@
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+metadata:
+  name: frontend-ip-targets
+  namespace: dev-frontend
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: frontend
+  defaultConfiguration:
+    targetType: ip

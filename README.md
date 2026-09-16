@@ -19,8 +19,9 @@ This repository does not build or publish images and does not create namespaces 
 |-- argocd/
 |   `-- root-app.yaml
 |-- dev/
-|   |-- apps/                       # microservice and validation Applications
-|   |-- frontend/                   # Deployment and ClusterIP Service
+|   |-- apps/                       # workload, validation, and gateway Applications
+|   |-- gateway/                    # GatewayClass, Gateway, and AWS LB configuration
+|   |-- frontend/                   # Deployment, ClusterIP Service, and HTTPRoute
 |   |-- auth-api/                   # Deployment and ClusterIP Service
 |   |-- users-api/                  # Deployment and ClusterIP Service
 |   |-- todos-api/                  # API plus its internal Redis dependency
@@ -34,7 +35,7 @@ DEV is the only configured environment. `staging/` and `prod/` are intentional s
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages the five microservice Applications plus one isolated validation Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main`, reads `dev/apps`, and manages the five microservice Applications, one isolated validation Application, and the shared gateway Application:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -44,6 +45,7 @@ DEV is the only configured environment. `staging/` and `prod/` are intentional s
 | `todos-api` | `dev/todos-api` | `dev-todos-api` |
 | `log-message-processor` | `dev/log-message-processor` | `dev-log-message-processor` |
 | `gitops-validation` | `dev/gitops-validation` | `dev-frontend` |
+| `gateway` | `dev/gateway` | `dev-frontend` |
 
 Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent because Terraform owns all five namespaces.
 
@@ -61,7 +63,7 @@ Images come from account `429418377318` in `us-east-1`:
 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor
 ```
 
-The ECR repositories were recreated and could not be inspected while this repository was initialized. Each microservice manifest therefore contains the explicit non-deployable tag `__IMAGE_TAG_PENDING_CI__`. Microservice Pods cannot become healthy until CI has published real immutable tags and all placeholders have been replaced. Argo CD and the image-independent `gitops-validation` Application can still be bootstrapped to prove reconciliation.
+Each Deployment references a real immutable tag published by its application CI pipeline. Git remains the only place where deployed image versions are selected; `latest` and invented tags are forbidden.
 
 To update a version, edit only the applicable Deployment image, for example:
 
@@ -76,10 +78,42 @@ kubectl rollout status deployment/todos-api -n dev-todos-api
 kubectl get pods -n dev-todos-api
 ```
 
-Before committing, ensure no placeholder remains:
+Before committing, ensure no placeholder or mutable `latest` tag remains:
 
 ```bash
 rg '__IMAGE_TAG_PENDING_CI__' dev
+rg ':latest' dev
+```
+
+## Gateway API routing
+
+DEV has one public entry point and keeps every application Service as `ClusterIP`:
+
+```text
+Internet
+  -> one internet-facing AWS Application Load Balancer
+  -> docket-dev-gateway (Gateway, port 80)
+  -> frontend (HTTPRoute PathPrefix /, IP targets on port 8080)
+  -> frontend runtime proxy
+       /login -> auth-api -> users-api
+       /todos -> todos-api -> Redis
+```
+
+The worker has no Service and remains private. `auth-api`, `users-api`, `todos-api`, and Redis are also private; the frontend's existing runtime proxy provides the same-origin API paths, so no browser configuration or image rebuild is required.
+
+Routing uses Kubernetes Gateway API instead of Ingress. `GatewayClass/docket-alb` selects the AWS Load Balancer Controller. The namespaced `LoadBalancerConfiguration/docket-dev-alb-config` requests one internet-facing IPv4 ALB, and `TargetGroupConfiguration/frontend-ip-targets` explicitly selects `ip` targets for the frontend Service. `Gateway/docket-dev-gateway` permits HTTPRoutes only from namespaces labeled `environment=dev`; the only public route is `HTTPRoute/frontend` in `dev-frontend`.
+
+The `gateway` Argo CD Application owns these resources. Changes must be merged to `main` and reconciled automatically; do not apply routing manifests or trigger a manual sync. The shared ALB incurs AWS cost while it exists.
+
+Inspect the reconciled route and AWS resources with:
+
+```bash
+kubectl get gatewayclass docket-alb
+kubectl get gateway docket-dev-gateway -n dev-frontend
+kubectl get httproute frontend -n dev-frontend
+kubectl get ingress -A
+aws elbv2 describe-load-balancers --region us-east-1
+aws elbv2 describe-target-groups --region us-east-1
 ```
 
 ## JWT Secret prerequisite
@@ -129,7 +163,7 @@ On Windows, the same pinned and internal-only installation is automated by:
 .\scripts\verify-argocd.ps1
 ```
 
-No Ingress or public LoadBalancer is used.
+Argo CD itself remains internal: its Service is `ClusterIP` and no Ingress exposes it. The public application entry point is the single Gateway-managed ALB described above; no application Service uses type `LoadBalancer`.
 
 ## Bootstrap and inspect
 
@@ -147,7 +181,7 @@ On Windows, bootstrap only the root Application with:
 .\scripts\bootstrap-root-app.ps1
 ```
 
-Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, and `gitops-validation`.
+Expected Applications are `docket-dev-root`, `frontend`, `auth-api`, `users-api`, `todos-api`, `log-message-processor`, `gitops-validation`, and `gateway`.
 
 If the Argo CD CLI is installed:
 
@@ -216,21 +250,6 @@ The pod-template reconciliation marker remains available for later workload-spec
 3. Observe `OutOfSync` followed by `Synced` with `kubectl get applications -n argocd -w`.
 4. Confirm the live annotation with `kubectl get deployment <name> -n <namespace> -o jsonpath='{.spec.template.metadata.annotations}'`.
 
-## Pending live execution
+## Current live state
 
-Repository construction can proceed without cluster access, but these steps remain cluster-dependent:
-
-1. Authenticate to AWS account `429418377318`.
-2. Verify `docket-dev` is ACTIVE and update kubeconfig.
-3. Verify at least one node is Ready and all Terraform-owned DEV namespaces exist.
-4. Inspect ECR and replace every pending tag with a real immutable CI-published tag.
-5. Provision the three `docket-jwt` Secrets out of band.
-6. Install Helm if needed, then install pinned Argo CD in `argocd`.
-7. Verify all Argo CD pods and Services.
-8. Merge the GitOps pull request to `main`.
-9. Apply `argocd/root-app.yaml` once.
-10. Verify the root and five child Applications.
-11. Validate automated sync and self-heal.
-12. Commit a later real image-tag update and observe the automatic rollout without manual sync.
-
-At initialization, live validation was blocked because AWS CLI had no configured credentials and `C:\Users\juanp\.kube\config` was inaccessible to the current process.
+The `docket-dev` cluster, Terraform-owned namespaces, Argo CD installation, root Application, automated sync, self-heal behavior, immutable application images, and healthy workloads have been validated. Gateway routing is reconciled through the same App-of-Apps flow after its change is merged to `main`.

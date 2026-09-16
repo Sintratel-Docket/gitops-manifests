@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
+    targetRevision: main
+    path: dev/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev-frontend
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
