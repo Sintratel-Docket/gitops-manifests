@@ -1,5 +1,5 @@
 # Staging environment
 
-Staging is intentionally a skeleton. No staging manifests or Argo CD Applications exist yet.
+Staging mirrors the dev workloads with environment-specific namespaces, service DNS names, Gateway resources, and Argo CD Applications. It uses immutable CI-published ECR tags promoted from dev.
 
-When promoted, staging must use its own Terraform-managed namespaces, immutable CI-published ECR tags, environment-specific configuration, and a reviewed Argo CD root/child Application hierarchy. Do not copy DEV Secrets or credentials into Git.
+The `docket-staging` cluster must be registered in the central Argo CD instance before these Applications can synchronize. Create the required `docket-jwt` Secrets outside Git; do not store credentials in this repository.

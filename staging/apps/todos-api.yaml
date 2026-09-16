@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: docket-dev-root
+  name: staging-todos-api
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,10 +10,10 @@ spec:
   source:
     repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
     targetRevision: main
-    path: argocd/environments
+    path: staging/todos-api
   destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
+    name: docket-staging
+    namespace: staging-todos-api
   syncPolicy:
     automated:
       enabled: true
