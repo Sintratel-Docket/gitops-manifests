@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubecost
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubecost.github.io/cost-analyzer/
+    chart: cost-analyzer
+    targetRevision: 2.8.7
+    helm:
+      releaseName: kubecost
+      values: |
+        # Kubecost para el cluster dev de Docket.
+        # Footprint reducido (nodo t3.small) y sin dependencias de storage
+        # (datos efimeros; suficiente para dev/demo de FinOps).
+        global:
+          clusterId: docket-dev
+          grafana:
+            enabled: false
+            proxy: false
+        persistentVolume:
+          enabled: false
+        networkCosts:
+          enabled: false
+        forecasting:
+          enabled: false
+        prometheus:
+          server:
+            global:
+              external_labels:
+                cluster_id: docket-dev
+            persistentVolume:
+              enabled: false
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                memory: 1Gi
+          nodeExporter:
+            enabled: false
+          alertmanager:
+            enabled: false
+          pushgateway:
+            enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubecost
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
