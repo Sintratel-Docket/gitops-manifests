@@ -37,7 +37,7 @@ DEV, staging, and production each have environment-specific Applications and man
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, and the shared gateway Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, and the observability Application:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -48,8 +48,10 @@ DEV, staging, and production each have environment-specific Applications and man
 | `log-message-processor` | `dev/log-message-processor` | `dev-log-message-processor` |
 | `gitops-validation` | `dev/gitops-validation` | `dev-frontend` |
 | `gateway` | `dev/gateway` | `dev-frontend` |
+| `kubecost` | official `cost-analyzer` chart | `kubecost` |
+| `observability` | official `kube-prometheus-stack` chart plus `dev/observability` | `dev-observability` |
 
-Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent because Terraform owns all five namespaces.
+Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost retains its independently managed namespace option.
 
 Redis is required by the application source. Its Deployment and internal ClusterIP Service are managed by the `todos-api` Application in `dev-todos-api`. The worker uses the cross-namespace address `redis.dev-todos-api.svc.cluster.local`. Redis is supporting software, not a sixth microservice Application.
 

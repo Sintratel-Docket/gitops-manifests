@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: todos-api
+  namespace: dev-todos-api
+  labels:
+    observability.sintratel.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app: todos-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+

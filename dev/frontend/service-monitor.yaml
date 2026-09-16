@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: frontend
+  namespace: dev-frontend
+  labels:
+    observability.sintratel.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+

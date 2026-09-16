@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-message-processor
+  namespace: dev-log-message-processor
+  labels:
+    app: log-message-processor
+spec:
+  type: ClusterIP
+  selector:
+    app: log-message-processor
+  ports:
+    - name: metrics
+      port: 9100
+      targetPort: metrics
+      protocol: TCP
+

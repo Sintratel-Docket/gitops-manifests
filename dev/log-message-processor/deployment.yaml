@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: log-message-processor
-          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor:1.0.0-165ae2a
+          image: 429418377318.dkr.ecr.us-east-1.amazonaws.com/docket/log-message-processor:1.1.0-3e69e40
           imagePullPolicy: IfNotPresent
           env:
             - name: REDIS_HOST
@@ -28,3 +28,9 @@ spec:
               value: "6379"
             - name: REDIS_CHANNEL
               value: log_channel
+            - name: METRICS_PORT
+              value: "9100"
+          ports:
+            - name: metrics
+              containerPort: 9100
+              protocol: TCP

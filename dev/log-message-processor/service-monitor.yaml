@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: log-message-processor
+  namespace: dev-log-message-processor
+  labels:
+    observability.sintratel.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app: log-message-processor
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+

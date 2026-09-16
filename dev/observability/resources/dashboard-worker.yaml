@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docket-worker-dashboard
+  namespace: dev-observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  log-message-processor.json: |
+    {
+      "annotations":{"list":[]},"editable":false,"graphTooltip":1,"links":[],"refresh":"30s","schemaVersion":41,
+      "tags":["docket","log-message-processor"],"templating":{"list":[]},"time":{"from":"now-1h","to":"now"},
+      "title":"Docket / log-message-processor","uid":"docket-log-processor","version":1,
+      "panels":[
+        {"type":"timeseries","title":"Messages processed per second","gridPos":{"h":8,"w":12,"x":0,"y":0},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(docket_worker_messages_processed_total{service=\"log-message-processor\"}[5m]))","legendFormat":"messages/s"}]},
+        {"type":"timeseries","title":"Processing error rate","gridPos":{"h":8,"w":12,"x":12,"y":0},"fieldConfig":{"defaults":{"unit":"percent"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"100 * sum(rate(docket_worker_processing_failures_total{service=\"log-message-processor\"}[5m])) / clamp_min(sum(rate(docket_worker_messages_processed_total{service=\"log-message-processor\"}[5m])) + sum(rate(docket_worker_processing_failures_total{service=\"log-message-processor\"}[5m])), 0.000000001)","legendFormat":"errors"}]},
+        {"type":"timeseries","title":"Processing latency P50 / P95","gridPos":{"h":8,"w":12,"x":0,"y":8},"fieldConfig":{"defaults":{"unit":"s"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"histogram_quantile(0.50, sum by (le) (rate(docket_worker_processing_duration_seconds_bucket{service=\"log-message-processor\"}[5m])))","legendFormat":"p50"},{"refId":"B","expr":"histogram_quantile(0.95, sum by (le) (rate(docket_worker_processing_duration_seconds_bucket{service=\"log-message-processor\"}[5m])))","legendFormat":"p95"}]},
+        {"type":"timeseries","title":"CPU usage","gridPos":{"h":8,"w":12,"x":12,"y":8},"fieldConfig":{"defaults":{"unit":"cores"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"dev-log-message-processor\",pod=~\"log-message-processor-.*\",container=\"log-message-processor\"}[5m]))","legendFormat":"cores"}]},
+        {"type":"timeseries","title":"Memory working set","gridPos":{"h":8,"w":12,"x":0,"y":16},"fieldConfig":{"defaults":{"unit":"bytes"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(container_memory_working_set_bytes{namespace=\"dev-log-message-processor\",pod=~\"log-message-processor-.*\",container=\"log-message-processor\"})","legendFormat":"memory"}]},
+        {"type":"timeseries","title":"Pod availability / restarts","gridPos":{"h":8,"w":12,"x":12,"y":16},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(kube_pod_status_ready{namespace=\"dev-log-message-processor\",pod=~\"log-message-processor-.*\",condition=\"true\"})","legendFormat":"ready pods"},{"refId":"B","expr":"sum(kube_pod_container_status_restarts_total{namespace=\"dev-log-message-processor\",pod=~\"log-message-processor-.*\",container=\"log-message-processor\"})","legendFormat":"restarts"}]}
+      ]
+    }

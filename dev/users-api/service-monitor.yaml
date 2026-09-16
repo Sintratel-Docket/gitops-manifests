@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: users-api
+  namespace: dev-users-api
+  labels:
+    observability.sintratel.io/scrape: "true"
+spec:
+  selector:
+    matchLabels:
+      app: users-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+

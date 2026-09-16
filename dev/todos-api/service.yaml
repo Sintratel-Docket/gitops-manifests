@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: todos-api
   namespace: dev-todos-api
+  labels:
+    app: todos-api
 spec:
   type: ClusterIP
   selector:
