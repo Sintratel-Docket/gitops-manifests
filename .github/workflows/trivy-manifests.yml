@@ -7,6 +7,16 @@ name: Trivy Manifests
 # This is the only control that looks at the manifests themselves: the image
 # scanning in the CI pipelines covers what runs, not how it is declared to run.
 #
+# IMPORTANT - why this uses a matrix instead of scanning the repository root:
+# Trivy's file walker unconditionally skips the directory names `dev`, `proc`
+# and `sys`, so that scanning a root filesystem does not descend into device
+# nodes. That exclusion is matched by name at the scan root, and this repository
+# happens to lay out its environments as dev/ staging/ prod/. Scanning `.` there-
+# fore silently ignored every manifest under dev/ and reported a clean run.
+# There is no flag to clear Trivy's default skip list, so each environment
+# directory is scanned as its own root instead. Add staging and prod to the
+# matrix as they get real manifests.
+#
 # The gate starts in warn mode (TRIVY_EXIT_CODE: "0"); flip it to "1" once the
 # current findings are triaged.
 
@@ -28,19 +38,27 @@ env:
 
 jobs:
   trivy-manifests:
-    name: Kubernetes Misconfiguration Scan
+    name: Misconfiguration Scan (${{ matrix.path }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        path:
+          - argocd
+          - dev
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
+      # Reports first (SARIF never fails), gate afterwards, so findings always
+      # reach code scanning even when the gate is set to block.
       - name: Scan manifests (SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
-          scan-ref: .
+          scan-ref: ${{ matrix.path }}
           format: sarif
           output: trivy-manifests.sarif
           severity: ${{ env.TRIVY_SEVERITY }}
@@ -49,13 +67,13 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-manifests.sarif
-          category: trivy-manifests
+          category: trivy-manifests-${{ matrix.path }}
 
       - name: Gate on findings
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
-          scan-ref: .
+          scan-ref: ${{ matrix.path }}
           format: table
           severity: ${{ env.TRIVY_SEVERITY }}
           exit-code: ${{ env.TRIVY_EXIT_CODE }}
