@@ -1,0 +1,136 @@
+commonLabels:
+  observability.sintratel.io/scrape: "true"
+
+alertmanager:
+  enabled: false
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: false
+  ingress:
+    enabled: false
+  service:
+    type: ClusterIP
+  serviceMonitor:
+    labels:
+      observability.sintratel.io/scrape: "true"
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: dev-observability
+      provider:
+        allowUiUpdates: false
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
+
+prometheus:
+  enabled: true
+  ingress:
+    enabled: false
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    retention: 3d
+    walCompression: true
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector:
+      matchLabels:
+        observability.sintratel.io/scrape: "true"
+    serviceMonitorNamespaceSelector:
+      matchLabels:
+        environment: dev
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector:
+      matchLabels:
+        observability.sintratel.io/scrape: "true"
+    podMonitorNamespaceSelector:
+      matchLabels:
+        environment: dev
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    storageSpec:
+      emptyDir: {}
+
+prometheusOperator:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  prometheusConfigReloader:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+kubeStateMetrics:
+  enabled: true
+
+kube-state-metrics:
+  prometheus:
+    monitor:
+      additionalLabels:
+        observability.sintratel.io/scrape: "true"
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi
+
+nodeExporter:
+  enabled: true
+
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      additionalLabels:
+        observability.sintratel.io/scrape: "true"
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kubelet:
+  enabled: true
+  serviceMonitor:
+    cAdvisor: true
+
+# EKS does not expose these managed control-plane component endpoints to this chart.
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

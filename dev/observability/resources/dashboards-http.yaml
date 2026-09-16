@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docket-http-service-dashboards
+  namespace: dev-observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  auth-api.json: |
+    {
+      "annotations":{"list":[]},"editable":false,"graphTooltip":1,"links":[],"refresh":"30s","schemaVersion":41,
+      "tags":["docket","auth-api"],"templating":{"list":[]},"time":{"from":"now-1h","to":"now"},
+      "title":"Docket / auth-api","uid":"docket-auth-api","version":1,
+      "panels":[
+        {"type":"timeseries","title":"Requests per second","gridPos":{"h":8,"w":12,"x":0,"y":0},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(docket_http_requests_total{service=\"auth-api\"}[5m]))","legendFormat":"requests/s"}]},
+        {"type":"timeseries","title":"HTTP error rate","gridPos":{"h":8,"w":12,"x":12,"y":0},"fieldConfig":{"defaults":{"unit":"percent"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"100 * sum(rate(docket_http_requests_total{service=\"auth-api\",status=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(docket_http_requests_total{service=\"auth-api\"}[5m])), 0.000000001)","legendFormat":"errors"}]},
+        {"type":"timeseries","title":"Request latency P50 / P95","gridPos":{"h":8,"w":12,"x":0,"y":8},"fieldConfig":{"defaults":{"unit":"s"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"histogram_quantile(0.50, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"auth-api\"}[5m])))","legendFormat":"p50"},{"refId":"B","expr":"histogram_quantile(0.95, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"auth-api\"}[5m])))","legendFormat":"p95"}]},
+        {"type":"timeseries","title":"CPU usage","gridPos":{"h":8,"w":12,"x":12,"y":8},"fieldConfig":{"defaults":{"unit":"cores"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"dev-auth-api\",pod=~\"auth-api-.*\",container=\"auth-api\"}[5m]))","legendFormat":"cores"}]},
+        {"type":"timeseries","title":"Memory working set","gridPos":{"h":8,"w":12,"x":0,"y":16},"fieldConfig":{"defaults":{"unit":"bytes"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(container_memory_working_set_bytes{namespace=\"dev-auth-api\",pod=~\"auth-api-.*\",container=\"auth-api\"})","legendFormat":"memory"}]},
+        {"type":"timeseries","title":"Pod availability / restarts","gridPos":{"h":8,"w":12,"x":12,"y":16},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(kube_pod_status_ready{namespace=\"dev-auth-api\",pod=~\"auth-api-.*\",condition=\"true\"})","legendFormat":"ready pods"},{"refId":"B","expr":"sum(kube_pod_container_status_restarts_total{namespace=\"dev-auth-api\",pod=~\"auth-api-.*\",container=\"auth-api\"})","legendFormat":"restarts"}]}
+      ]
+    }
+  users-api.json: |
+    {
+      "annotations":{"list":[]},"editable":false,"graphTooltip":1,"links":[],"refresh":"30s","schemaVersion":41,
+      "tags":["docket","users-api"],"templating":{"list":[]},"time":{"from":"now-1h","to":"now"},
+      "title":"Docket / users-api","uid":"docket-users-api","version":1,
+      "panels":[
+        {"type":"timeseries","title":"Requests per second","gridPos":{"h":8,"w":12,"x":0,"y":0},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(docket_http_requests_total{service=\"users-api\"}[5m]))","legendFormat":"requests/s"}]},
+        {"type":"timeseries","title":"HTTP error rate","gridPos":{"h":8,"w":12,"x":12,"y":0},"fieldConfig":{"defaults":{"unit":"percent"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"100 * sum(rate(docket_http_requests_total{service=\"users-api\",status=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(docket_http_requests_total{service=\"users-api\"}[5m])), 0.000000001)","legendFormat":"errors"}]},
+        {"type":"timeseries","title":"Request latency P50 / P95","gridPos":{"h":8,"w":12,"x":0,"y":8},"fieldConfig":{"defaults":{"unit":"s"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"histogram_quantile(0.50, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"users-api\"}[5m])))","legendFormat":"p50"},{"refId":"B","expr":"histogram_quantile(0.95, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"users-api\"}[5m])))","legendFormat":"p95"}]},
+        {"type":"timeseries","title":"CPU usage","gridPos":{"h":8,"w":12,"x":12,"y":8},"fieldConfig":{"defaults":{"unit":"cores"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"dev-users-api\",pod=~\"users-api-.*\",container=\"users-api\"}[5m]))","legendFormat":"cores"}]},
+        {"type":"timeseries","title":"Memory working set","gridPos":{"h":8,"w":12,"x":0,"y":16},"fieldConfig":{"defaults":{"unit":"bytes"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(container_memory_working_set_bytes{namespace=\"dev-users-api\",pod=~\"users-api-.*\",container=\"users-api\"})","legendFormat":"memory"}]},
+        {"type":"timeseries","title":"Pod availability / restarts","gridPos":{"h":8,"w":12,"x":12,"y":16},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(kube_pod_status_ready{namespace=\"dev-users-api\",pod=~\"users-api-.*\",condition=\"true\"})","legendFormat":"ready pods"},{"refId":"B","expr":"sum(kube_pod_container_status_restarts_total{namespace=\"dev-users-api\",pod=~\"users-api-.*\",container=\"users-api\"})","legendFormat":"restarts"}]}
+      ]
+    }
+  todos-api.json: |
+    {
+      "annotations":{"list":[]},"editable":false,"graphTooltip":1,"links":[],"refresh":"30s","schemaVersion":41,
+      "tags":["docket","todos-api"],"templating":{"list":[]},"time":{"from":"now-1h","to":"now"},
+      "title":"Docket / todos-api","uid":"docket-todos-api","version":1,
+      "panels":[
+        {"type":"timeseries","title":"Requests per second","gridPos":{"h":8,"w":12,"x":0,"y":0},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(docket_http_requests_total{service=\"todos-api\"}[5m]))","legendFormat":"requests/s"}]},
+        {"type":"timeseries","title":"HTTP error rate","gridPos":{"h":8,"w":12,"x":12,"y":0},"fieldConfig":{"defaults":{"unit":"percent"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"100 * sum(rate(docket_http_requests_total{service=\"todos-api\",status=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(docket_http_requests_total{service=\"todos-api\"}[5m])), 0.000000001)","legendFormat":"errors"}]},
+        {"type":"timeseries","title":"Request latency P50 / P95","gridPos":{"h":8,"w":12,"x":0,"y":8},"fieldConfig":{"defaults":{"unit":"s"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"histogram_quantile(0.50, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"todos-api\"}[5m])))","legendFormat":"p50"},{"refId":"B","expr":"histogram_quantile(0.95, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"todos-api\"}[5m])))","legendFormat":"p95"}]},
+        {"type":"timeseries","title":"CPU usage","gridPos":{"h":8,"w":12,"x":12,"y":8},"fieldConfig":{"defaults":{"unit":"cores"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"dev-todos-api\",pod=~\"todos-api-.*\",container=\"todos-api\"}[5m]))","legendFormat":"cores"}]},
+        {"type":"timeseries","title":"Memory working set","gridPos":{"h":8,"w":12,"x":0,"y":16},"fieldConfig":{"defaults":{"unit":"bytes"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(container_memory_working_set_bytes{namespace=\"dev-todos-api\",pod=~\"todos-api-.*\",container=\"todos-api\"})","legendFormat":"memory"}]},
+        {"type":"timeseries","title":"Pod availability / restarts","gridPos":{"h":8,"w":12,"x":12,"y":16},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(kube_pod_status_ready{namespace=\"dev-todos-api\",pod=~\"todos-api-.*\",condition=\"true\"})","legendFormat":"ready pods"},{"refId":"B","expr":"sum(kube_pod_container_status_restarts_total{namespace=\"dev-todos-api\",pod=~\"todos-api-.*\",container=\"todos-api\"})","legendFormat":"restarts"}]}
+      ]
+    }
+  frontend.json: |
+    {
+      "annotations":{"list":[]},"editable":false,"graphTooltip":1,"links":[],"refresh":"30s","schemaVersion":41,
+      "tags":["docket","frontend"],"templating":{"list":[]},"time":{"from":"now-1h","to":"now"},
+      "title":"Docket / frontend","uid":"docket-frontend","version":1,
+      "panels":[
+        {"type":"timeseries","title":"Requests per second","gridPos":{"h":8,"w":12,"x":0,"y":0},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(docket_http_requests_total{service=\"frontend\"}[5m]))","legendFormat":"requests/s"}]},
+        {"type":"timeseries","title":"HTTP error rate","gridPos":{"h":8,"w":12,"x":12,"y":0},"fieldConfig":{"defaults":{"unit":"percent"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"100 * sum(rate(docket_http_requests_total{service=\"frontend\",status=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(docket_http_requests_total{service=\"frontend\"}[5m])), 0.000000001)","legendFormat":"errors"}]},
+        {"type":"timeseries","title":"Request latency P50 / P95","gridPos":{"h":8,"w":12,"x":0,"y":8},"fieldConfig":{"defaults":{"unit":"s"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"histogram_quantile(0.50, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"frontend\"}[5m])))","legendFormat":"p50"},{"refId":"B","expr":"histogram_quantile(0.95, sum by (le) (rate(docket_http_request_duration_seconds_bucket{service=\"frontend\"}[5m])))","legendFormat":"p95"}]},
+        {"type":"timeseries","title":"CPU usage","gridPos":{"h":8,"w":12,"x":12,"y":8},"fieldConfig":{"defaults":{"unit":"cores"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"dev-frontend\",pod=~\"frontend-.*\",container=\"frontend\"}[5m]))","legendFormat":"cores"}]},
+        {"type":"timeseries","title":"Memory working set","gridPos":{"h":8,"w":12,"x":0,"y":16},"fieldConfig":{"defaults":{"unit":"bytes"}},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(container_memory_working_set_bytes{namespace=\"dev-frontend\",pod=~\"frontend-.*\",container=\"frontend\"})","legendFormat":"memory"}]},
+        {"type":"timeseries","title":"Pod availability / restarts","gridPos":{"h":8,"w":12,"x":12,"y":16},"datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"refId":"A","expr":"sum(kube_pod_status_ready{namespace=\"dev-frontend\",pod=~\"frontend-.*\",condition=\"true\"})","legendFormat":"ready pods"},{"refId":"B","expr":"sum(kube_pod_container_status_restarts_total{namespace=\"dev-frontend\",pod=~\"frontend-.*\",container=\"frontend\"})","legendFormat":"restarts"}]}
+      ]
+    }

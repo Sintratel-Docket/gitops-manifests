@@ -28,7 +28,12 @@ spec:
               value: http://auth-api.dev-auth-api.svc.cluster.local:8000
             - name: TODOS_API_ADDRESS
               value: http://todos-api.dev-todos-api.svc.cluster.local:8082
+            - name: METRICS_PORT
+              value: "9090"
           ports:
             - name: http
               containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
               protocol: TCP

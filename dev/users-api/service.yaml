@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: users-api
   namespace: dev-users-api
+  labels:
+    app: users-api
 spec:
   type: ClusterIP
   selector:
