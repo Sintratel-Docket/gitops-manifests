@@ -11,3 +11,8 @@ spec:
     Environment: dev
     ManagedBy: ArgoCD
     Project: Sintratel-Docket
+  # TLS del listener HTTPS:443 — certificado autofirmado importado en ACM
+  # (sin dominio propio; demuestra cifrado en tránsito). Ver docs/security/access-control.md.
+  listenerConfigurations:
+    - protocolPort: HTTPS:443
+      defaultCertificate: arn:aws:acm:us-east-1:429418377318:certificate/125b5861-4f60-4336-b7f0-771289987000
