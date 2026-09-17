@@ -14,8 +14,6 @@ spec:
   destination:
     name: docket-prod
     namespace: prod-frontend
-  syncPolicy:
-    automated:
-      enabled: true
-      prune: true
-      selfHeal: true
+  # Producción: sync MANUAL (sin 'automated'). El despliegue a prod requiere
+  # aprobacion por PR + un "Sync" explicito en Argo CD (promocion controlada, #9).
+  syncPolicy: {}
