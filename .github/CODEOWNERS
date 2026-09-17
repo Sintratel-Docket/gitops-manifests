@@ -1,0 +1,8 @@
+# Code owners para SINTRATEL Docket GitOps.
+#
+# Los cambios a PRODUCCIÓN requieren la aprobación de un líder antes de
+# mergear (promoción controlada / aprobación manual — issue #9).
+# Combinar con branch protection en `main`: "Require review from Code Owners".
+
+/prod/          @Juanmadiaz45
+/argocd/        @Juanmadiaz45
