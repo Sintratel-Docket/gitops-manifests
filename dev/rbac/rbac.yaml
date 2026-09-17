@@ -1,0 +1,38 @@
+# RBAC básico del cluster: rol de solo lectura vs. rol de administración.
+# Los grupos (docket:viewers / docket:admins) se asignan a identidades IAM
+# mediante EKS Access Entries (kubernetesGroups). Ver docs/security/access-control.md.
+#
+# Nota: los administradores actuales (JuanP, Karen) ya tienen cluster-admin vía
+# EKS Access Policy (AmazonEKSClusterAdminPolicy). El binding docket:admins de
+# abajo documenta el modelo y permite sumar admins vía grupo si se desea.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: docket-viewers
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: docket-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view # rol de solo lectura integrado de Kubernetes (sin secrets)
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: docket:viewers
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: docket-admins
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/part-of: docket-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin # rol de administración integrado de Kubernetes
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: docket:admins
