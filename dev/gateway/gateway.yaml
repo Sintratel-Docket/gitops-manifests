@@ -23,3 +23,19 @@ spec:
           selector:
             matchLabels:
               environment: dev
+    # TLS: el ALB termina HTTPS con el certificado ACM definido en el
+    # LoadBalancerConfiguration (listenerConfigurations, protocolPort HTTPS:443).
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+      allowedRoutes:
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              environment: dev
