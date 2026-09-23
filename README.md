@@ -37,7 +37,7 @@ DEV, staging, and production each have environment-specific Applications and man
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, and the observability Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, the observability Application, and SonarQube:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -50,8 +50,9 @@ DEV, staging, and production each have environment-specific Applications and man
 | `gateway` | `dev/gateway` | `dev-frontend` |
 | `kubecost` | official `cost-analyzer` chart | `kubecost` |
 | `observability` | official `kube-prometheus-stack` chart plus `dev/observability` | `dev-observability` |
+| `sonarqube` | official `postgresql` and `sonarqube` charts | `sonarqube` |
 
-Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost retains its independently managed namespace option.
+Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost and SonarQube retain their independently managed namespace option.
 
 Redis is required by the application source. Its Deployment and internal ClusterIP Service are managed by the `todos-api` Application in `dev-todos-api`. The worker uses the cross-namespace address `redis.dev-todos-api.svc.cluster.local`. Redis is supporting software, not a sixth microservice Application.
 
@@ -137,6 +138,21 @@ kubectl create secret generic docket-jwt -n <namespace> --from-file=jwt-secret=/
 ```
 
 Repeat for each required namespace using the same protected value. Do not paste or log the value.
+
+## SonarQube secret prerequisites
+
+The `sonarqube` Application (`dev/apps/sonarqube.yaml`) references three Secrets that must exist in the `sonarqube` namespace before it can become healthy. None of these values are committed here:
+
+- `sonarqube-db-credentials` — password for the in-cluster Postgres and for SonarQube's own `jdbcOverwrite` connection. Both the Postgres chart and the SonarQube chart read the same key so the two stay in sync.
+- `sonarqube-monitoring-passcode` — without it the SonarQube pod's readiness probe never succeeds; the chart hard-fails startup on a missing passcode by design.
+
+```bash
+kubectl create namespace sonarqube
+kubectl create secret generic sonarqube-db-credentials -n sonarqube --from-literal=password=/secure/generated/db-password
+kubectl create secret generic sonarqube-monitoring-passcode -n sonarqube --from-literal=passcode=/secure/generated/passcode
+```
+
+Until these exist, Argo CD reports `sonarqube` as `OutOfSync`/degraded rather than failing the rest of the sync — it does not block the microservice Applications. SonarQube's Service stays `ClusterIP`; it is not exposed through the Gateway/ALB, so reach it the same way as Argo CD itself, via `kubectl port-forward`. Wiring CI to it (`SONAR_HOST_URL` / `SONAR_TOKEN` in the `dotgithub` reusable workflow) is a separate step once the server is reachable from GitHub Actions.
 
 ## Install Argo CD
 
