@@ -18,6 +18,11 @@ spec:
       helm:
         releaseName: sonarqube-db
         values: |
+          # Bitnami stopped publishing free images under docker.io/bitnami/*
+          # as of Aug 2025; the pinned tag this chart expects only exists
+          # under docker.io/bitnamilegacy/* now.
+          image:
+            repository: bitnamilegacy/postgresql
           auth:
             username: sonarqube
             database: sonarqube
