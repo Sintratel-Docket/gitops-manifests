@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  users-api:
+    build: ../../users-api
+    environment:
+      JWT_SECRET: ci-integration-secret
+      SERVER_PORT: 8083
+    ports: ["8083:8083"]
+
+  auth-api:
+    build: ../../auth-api
+    environment:
+      JWT_SECRET: ci-integration-secret
+      AUTH_API_PORT: 8000
+      USERS_API_ADDRESS: http://users-api:8083
+    depends_on: [users-api]
+    ports: ["8000:8000"]
+
+  todos-api:
+    build: ../../todos-api
+    environment:
+      JWT_SECRET: ci-integration-secret
+      TODO_API_PORT: 8082
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CHANNEL: log_channel
+      ZIPKIN_URL: ""
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports: ["8082:8082"]
+
+  log-message-processor:
+    build: ../../log-message-processor
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CHANNEL: log_channel
+      METRICS_PORT: 9100
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports: ["9100:9100"]

@@ -89,6 +89,10 @@ Manual Kubernetes image changes are not the normal rollback path because Argo CD
 
 Before a live staging or production promotion:
 
+- Require the `Promotion gate` GitHub status check. It represents passing unit
+  coverage thresholds and 100% of critical integration/E2E scenarios; do not
+  merge a promotion PR when this check is missing, failed, or cancelled.
+
 - Register the clusters in the central Argo CD instance as `docket-staging` and `docket-prod`.
 - Provision the environment namespaces managed by Terraform.
 - Provision the external `docket-jwt` Secret in each namespace that requires it. Never store its value in Git.

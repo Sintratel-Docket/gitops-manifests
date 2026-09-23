@@ -1,0 +1,123 @@
+name: Docket quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-coverage:
+    name: Unit tests and consolidated coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {repository: Sintratel-Docket/auth-api, ref: "${{ github.repository == 'Sintratel-Docket/auth-api' && github.sha || 'main' }}", path: auth-api}
+      - uses: actions/checkout@v4
+        with: {repository: Sintratel-Docket/users-api, ref: "${{ github.repository == 'Sintratel-Docket/users-api' && github.sha || 'main' }}", path: users-api}
+      - uses: actions/checkout@v4
+        with: {repository: Sintratel-Docket/todos-api, ref: "${{ github.repository == 'Sintratel-Docket/todos-api' && github.sha || 'main' }}", path: todos-api}
+      - uses: actions/checkout@v4
+        with: {repository: Sintratel-Docket/log-message-processor, ref: "${{ github.repository == 'Sintratel-Docket/log-message-processor' && github.sha || 'main' }}", path: log-message-processor}
+      - uses: actions/checkout@v4
+        with: {repository: Sintratel-Docket/frontend, ref: "${{ github.repository == 'Sintratel-Docket/frontend' && github.sha || 'main' }}", path: frontend}
+      - uses: actions/setup-go@v5
+        with: {go-version: "1.18"}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "8", cache: maven}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.10"}
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - name: Auth API unit tests
+        working-directory: auth-api
+        run: |
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+          coverage=$(go tool cover -func=coverage.out | awk '/total:/ {gsub("%", "", $3); print $3}')
+          awk -v coverage="$coverage" 'BEGIN { if (coverage < 55) exit 1 }'
+      - name: Users API unit tests
+        working-directory: users-api
+        run: chmod +x mvnw && ./mvnw -B verify
+      - name: Todos API unit tests
+        working-directory: todos-api
+        run: npm ci && npm run test:coverage
+      - name: Log processor unit tests
+        working-directory: log-message-processor
+        run: pip install -r requirements.txt pytest pytest-cov && pytest --cov=main --cov-report=xml --cov-fail-under=55
+      - uses: actions/setup-node@v4
+        with: {node-version: "8"}
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm install --ignore-scripts && npm run test:coverage
+      - name: Assemble consolidated coverage artifact
+        run: |
+          mkdir -p consolidated-coverage/{auth-api,users-api,todos-api,log-message-processor,frontend}
+          cp auth-api/coverage.out consolidated-coverage/auth-api/
+          cp -r users-api/target/site/jacoco/. consolidated-coverage/users-api/
+          cp -r todos-api/coverage/. consolidated-coverage/todos-api/
+          cp log-message-processor/coverage.xml consolidated-coverage/log-message-processor/
+          cp -r frontend/coverage/. consolidated-coverage/frontend/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docket-consolidated-coverage
+          path: consolidated-coverage
+
+  integration-e2e:
+    name: Critical integration and E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Sintratel-Docket/gitops-manifests
+          ref: ${{ github.repository == 'Sintratel-Docket/gitops-manifests' && github.sha || 'main' }}
+          path: gitops-manifests
+      - uses: actions/checkout@v4
+        with:
+          repository: Sintratel-Docket/auth-api
+          ref: ${{ github.repository == 'Sintratel-Docket/auth-api' && github.sha || 'main' }}
+          path: auth-api
+      - uses: actions/checkout@v4
+        with:
+          repository: Sintratel-Docket/users-api
+          ref: ${{ github.repository == 'Sintratel-Docket/users-api' && github.sha || 'main' }}
+          path: users-api
+      - uses: actions/checkout@v4
+        with:
+          repository: Sintratel-Docket/todos-api
+          ref: ${{ github.repository == 'Sintratel-Docket/todos-api' && github.sha || 'main' }}
+          path: todos-api
+      - uses: actions/checkout@v4
+        with:
+          repository: Sintratel-Docket/log-message-processor
+          ref: ${{ github.repository == 'Sintratel-Docket/log-message-processor' && github.sha || 'main' }}
+          path: log-message-processor
+      - name: Build and start related services
+        working-directory: gitops-manifests
+        run: docker compose -f tests/docker-compose.yml up --build --wait --wait-timeout 180
+      - name: Run critical integration and E2E scenarios
+        working-directory: gitops-manifests
+        run: python tests/e2e_test.py
+      - name: Capture service logs
+        if: always()
+        working-directory: gitops-manifests
+        run: docker compose -f tests/docker-compose.yml logs --no-color > test-results.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-e2e-results
+          path: gitops-manifests/test-results.log
+      - name: Stop test environment
+        if: always()
+        working-directory: gitops-manifests
+        run: docker compose -f tests/docker-compose.yml down -v
+
+  promotion-gate:
+    name: Promotion gate
+    needs: [unit-coverage, integration-e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Critical E2E pass rate is 100%; promotion is allowed."
