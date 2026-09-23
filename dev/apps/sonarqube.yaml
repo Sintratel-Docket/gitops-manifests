@@ -1,0 +1,89 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sonarqube
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Minimal in-cluster Postgres for SonarQube's own metadata store. Dev
+    # only: no persistence, data is disposable. Credentials come from a
+    # pre-existing Secret (sonarqube-db-credentials) provisioned out of band,
+    # same pattern as docket-jwt -- never committed to Git.
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: postgresql
+      targetRevision: 16.7.4
+      helm:
+        releaseName: sonarqube-db
+        values: |
+          auth:
+            username: sonarqube
+            database: sonarqube
+            existingSecret: sonarqube-db-credentials
+            secretKeys:
+              userPasswordKey: password
+          primary:
+            persistence:
+              enabled: false
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+    # SonarQube Community Edition. No bundled database in this chart version;
+    # it points at the Postgres source above via jdbcOverwrite. initSysctl
+    # bumps vm.max_map_count for the bundled Elasticsearch through a
+    # privileged init container -- confirm the dev node group allows it
+    # before relying on automated sync.
+    - repoURL: https://SonarSource.github.io/helm-chart-sonarqube
+      chart: sonarqube
+      targetRevision: 2026.5.0
+      helm:
+        releaseName: sonarqube
+        values: |
+          persistence:
+            enabled: false
+          service:
+            type: ClusterIP
+          ingress:
+            enabled: false
+          # Exposed through the shared Gateway/ALB at /sonarqube (see
+          # dev/sonarqube/resources/http-route.yaml); the app must know its
+          # own path prefix to render correct links and load assets.
+          env:
+            - name: SONAR_WEB_CONTEXT
+              value: /sonarqube
+          # The Gateway/ALB is internet-facing and has no IP allowlist (GitHub
+          # Actions hosted runners have no stable IP range to allow), so the
+          # only access control on the public path is this: authentication is
+          # mandatory for every page and every API call, anonymous browsing is
+          # off. Do not disable this without adding a network-level control
+          # (WAF IP allowlist + a self-hosted runner, tracked separately in
+          # docket-infra) to replace it.
+          sonarProperties:
+            sonar.forceAuthentication: "true"
+          monitoringPasscodeSecretName: sonarqube-monitoring-passcode
+          monitoringPasscodeSecretKey: passcode
+          jdbcOverwrite:
+            jdbcUrl: "jdbc:postgresql://sonarqube-db-postgresql.sonarqube.svc.cluster.local:5432/sonarqube"
+            jdbcUsername: sonarqube
+            jdbcSecretName: sonarqube-db-credentials
+            jdbcSecretPasswordKey: password
+    # Namespace label (Gateway only accepts routes from namespaces labeled
+    # environment=dev) and the HTTPRoute that publishes SonarQube at
+    # /sonarqube on the existing shared ALB.
+    - repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
+      targetRevision: main
+      path: dev/sonarqube/resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sonarqube
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

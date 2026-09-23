@@ -37,7 +37,7 @@ DEV, staging, and production each have environment-specific Applications and man
 
 ## App of Apps
 
-`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, and the observability Application:
+`argocd/root-app.yaml` defines `docket-dev-root`. It tracks `main` and reads `argocd/environments`, whose environment Applications read `dev/apps`, `staging/apps`, and `prod/apps`. The DEV Application manages the five microservice Applications, one isolated validation Application, the shared gateway Application, Kubecost, the observability Application, and SonarQube:
 
 | Application | Git path | Destination namespace |
 | --- | --- | --- |
@@ -50,8 +50,9 @@ DEV, staging, and production each have environment-specific Applications and man
 | `gateway` | `dev/gateway` | `dev-frontend` |
 | `kubecost` | official `cost-analyzer` chart | `kubecost` |
 | `observability` | official `kube-prometheus-stack` chart plus `dev/observability` | `dev-observability` |
+| `sonarqube` | official `postgresql` and `sonarqube` charts | `sonarqube` |
 
-Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost retains its independently managed namespace option.
+Every Application uses automated sync with `enabled: true`, `prune: true`, and `selfHeal: true`. Argo CD therefore applies changes merged to `main`, removes objects deleted from Git, and reverts live drift. `CreateNamespace=true` is intentionally absent from the application and observability Applications because Terraform owns the five application namespaces and `dev-observability`; Kubecost and SonarQube retain their independently managed namespace option.
 
 Redis is required by the application source. Its Deployment and internal ClusterIP Service are managed by the `todos-api` Application in `dev-todos-api`. The worker uses the cross-namespace address `redis.dev-todos-api.svc.cluster.local`. Redis is supporting software, not a sixth microservice Application.
 
@@ -103,9 +104,10 @@ Internet
   -> frontend runtime proxy
        /login -> auth-api -> users-api
        /todos -> todos-api -> Redis
+  -> sonarqube (HTTPRoute PathPrefix /sonarqube, port 9000)
 ```
 
-The worker has no Service and remains private. `auth-api`, `users-api`, `todos-api`, and Redis are also private; the frontend's existing runtime proxy provides the same-origin API paths, so no browser configuration or image rebuild is required.
+The worker has no Service and remains private. `auth-api`, `users-api`, `todos-api`, and Redis are also private; the frontend's existing runtime proxy provides the same-origin API paths, so no browser configuration or image rebuild is required. `sonarqube` is the one internal tool published on this ALB, and only because CI needs to reach it; see [SonarQube: secrets, exposure, and wiring CI](#sonarqube-secrets-exposure-and-wiring-ci) for why authentication (not network restriction) is what actually protects it.
 
 Routing uses Kubernetes Gateway API instead of Ingress. `GatewayClass/docket-alb` selects the AWS Load Balancer Controller. The namespaced `LoadBalancerConfiguration/docket-dev-alb-config` requests one internet-facing IPv4 ALB, and `TargetGroupConfiguration/frontend-ip-targets` explicitly selects `ip` targets for the frontend Service. `Gateway/docket-dev-gateway` permits HTTPRoutes only from namespaces labeled `environment=dev`; the only public route is `HTTPRoute/frontend` in `dev-frontend`.
 
@@ -137,6 +139,54 @@ kubectl create secret generic docket-jwt -n <namespace> --from-file=jwt-secret=/
 ```
 
 Repeat for each required namespace using the same protected value. Do not paste or log the value.
+
+## SonarQube: secrets, exposure, and wiring CI
+
+Bringing SonarQube from "deployed" to "used by every pipeline" is three separate steps. Nothing sensitive in any of them is committed to this repo.
+
+### 1. Kubernetes secrets (server won't start without these)
+
+The `sonarqube` Application (`dev/apps/sonarqube.yaml`) references two Secrets that must exist in the `sonarqube` namespace before it becomes healthy:
+
+- `sonarqube-db-credentials` — password for the in-cluster Postgres and for SonarQube's own `jdbcOverwrite` connection. Both charts read the same key so the two stay in sync.
+- `sonarqube-monitoring-passcode` — without it the pod's readiness probe never succeeds; the chart hard-fails startup on a missing passcode by design.
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name docket-dev
+kubectl create namespace sonarqube
+
+DB_PASS=$(openssl rand -base64 24)
+MONITORING_PASS=$(openssl rand -base64 24)
+
+kubectl create secret generic sonarqube-db-credentials -n sonarqube --from-literal=password="$DB_PASS"
+kubectl create secret generic sonarqube-monitoring-passcode -n sonarqube --from-literal=passcode="$MONITORING_PASS"
+```
+
+Save `$DB_PASS` and `$MONITORING_PASS` in your secrets manager, not in a file. Until these Secrets exist, Argo CD reports `sonarqube` as `OutOfSync`/degraded — it does not block the microservice Applications. Once healthy:
+
+```bash
+kubectl get pods -n sonarqube
+kubectl port-forward svc/sonarqube-sonarqube -n sonarqube 9000:9000
+```
+
+Open `http://localhost:9000`, log in as `admin`/`admin`, and change the password on first login — same flow as the Argo CD initial-admin step above.
+
+### 2. Public exposure at `/sonarqube` (already wired in this branch)
+
+SonarQube is published through the same shared internet-facing ALB the frontend uses, via `dev/sonarqube/resources/http-route.yaml`, at path `/sonarqube`. This ALB has no IP allowlist and GitHub-hosted Actions runners have no stable IP range to allow one against, so **authentication is the only access control**: `dev/apps/sonarqube.yaml` sets `sonar.forceAuthentication: "true"`, which disables anonymous browsing and anonymous API calls entirely. Do not turn that off without replacing it with a network-level control (a WAF IP allowlist plus a self-hosted, VPC-internal Actions runner — a separate `docket-infra` change, not something to add casually since it has its own maintenance cost).
+
+### 3. Point CI at it
+
+Once the server is reachable at its public URL and you have logged in as a real (non-`admin`) user:
+
+1. In SonarQube: **My Account → Security → Generate Token**. Name it something like `github-actions-ci`, scope it to CI use, and copy it once — it isn't shown again.
+2. In GitHub, at the `Sintratel-Docket` organization level (so every repo's `secrets: inherit` picks it up without per-repo setup):
+   ```bash
+   gh variable set SONAR_HOST_URL --org Sintratel-Docket --body "https://<the ALB's public DNS or domain>/sonarqube"
+   gh secret set SONAR_TOKEN --org Sintratel-Docket --body "<the token from step 1>"
+   ```
+   (`gh variable`/`gh secret set --org` needs an org owner token; ask whoever administers the GitHub org if you don't have one.)
+3. That's it — `reusable-sonarqube-scan.yml` in `dotgithub` is guarded on `vars.SONAR_HOST_URL != ''`, so every microservice's `sonarqube` CI job goes from skipped to running on the next push, with no further changes needed in any of the five service repos.
 
 ## Install Argo CD
 
