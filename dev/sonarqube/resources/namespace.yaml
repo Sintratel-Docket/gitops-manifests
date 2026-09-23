@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sonarqube
+  labels:
+    environment: dev
+  annotations:
+    # Must exist (with the label) before the HTTPRoute and Helm sources in
+    # this Application sync, since the Gateway only accepts routes from
+    # namespaces labeled environment=dev.
+    argocd.argoproj.io/sync-wave: "-1"

@@ -48,6 +48,21 @@ spec:
             type: ClusterIP
           ingress:
             enabled: false
+          # Exposed through the shared Gateway/ALB at /sonarqube (see
+          # dev/sonarqube/resources/http-route.yaml); the app must know its
+          # own path prefix to render correct links and load assets.
+          env:
+            - name: SONAR_WEB_CONTEXT
+              value: /sonarqube
+          # The Gateway/ALB is internet-facing and has no IP allowlist (GitHub
+          # Actions hosted runners have no stable IP range to allow), so the
+          # only access control on the public path is this: authentication is
+          # mandatory for every page and every API call, anonymous browsing is
+          # off. Do not disable this without adding a network-level control
+          # (WAF IP allowlist + a self-hosted runner, tracked separately in
+          # docket-infra) to replace it.
+          sonarProperties:
+            sonar.forceAuthentication: "true"
           monitoringPasscodeSecretName: sonarqube-monitoring-passcode
           monitoringPasscodeSecretKey: passcode
           jdbcOverwrite:
@@ -55,6 +70,12 @@ spec:
             jdbcUsername: sonarqube
             jdbcSecretName: sonarqube-db-credentials
             jdbcSecretPasswordKey: password
+    # Namespace label (Gateway only accepts routes from namespaces labeled
+    # environment=dev) and the HTTPRoute that publishes SonarQube at
+    # /sonarqube on the existing shared ALB.
+    - repoURL: https://github.com/Sintratel-Docket/gitops-manifests.git
+      targetRevision: main
+      path: dev/sonarqube/resources
   destination:
     server: https://kubernetes.default.svc
     namespace: sonarqube
