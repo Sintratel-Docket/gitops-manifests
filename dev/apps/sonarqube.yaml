@@ -42,6 +42,10 @@ spec:
       helm:
         releaseName: sonarqube
         values: |
+          # Chart >=2026.x requires an explicit edition choice; this is the
+          # free Community Build, not the commercial Developer/Enterprise tier.
+          community:
+            enabled: true
           persistence:
             enabled: false
           service:
