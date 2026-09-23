@@ -38,7 +38,7 @@ spec:
     # before relying on automated sync.
     - repoURL: https://SonarSource.github.io/helm-chart-sonarqube
       chart: sonarqube
-      targetRevision: 2026.5.0
+      targetRevision: 2026.4.1
       helm:
         releaseName: sonarqube
         values: |
