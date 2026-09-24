@@ -6,6 +6,9 @@ alertmanager:
 
 grafana:
   enabled: true
+  grafana.ini:
+    plugins:
+      preinstall_auto_update: false
   defaultDashboardsEnabled: false
   ingress:
     enabled: false
